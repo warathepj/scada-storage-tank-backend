@@ -5,6 +5,7 @@ const path = require('path');
 // MQTT client setup
 const MQTT_BROKER_URL = 'mqtt://test.mosquitto.org:1883';
 const MQTT_TOPICS = ['tankscape/alerts'];
+const WEBHOOK_URL = 'your-webhook-url';
 
 // MQTT connection options
 const colorCodes = {
@@ -22,6 +23,25 @@ const mqttOptions = {
 
 // Initialize MQTT client
 const client = mqtt.connect(MQTT_BROKER_URL, mqttOptions);
+
+async function sendWebhook(data) {
+    try {
+        const response = await fetch(WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        logToConsole('SUCCESS', 'Webhook sent successfully');
+    } catch (error) {
+        logToConsole('ERROR', 'Failed to send webhook:', error.message);
+    }
+}
 
 function logToConsole(type, message, data) {
     const timestamp = new Date().toISOString();
@@ -51,6 +71,7 @@ client.on('message', (topic, message) => {
     try {
         const data = JSON.parse(message.toString());
         logToConsole('INFO', `Received message on ${topic}:`, data);
+        sendWebhook(data);
     } catch (error) {
         logToConsole('ERROR', `Failed to parse message on ${topic}:`, message.toString());
     }
@@ -66,7 +87,7 @@ process.on('SIGTERM', () => {
     logToConsole('WARNING', 'Received SIGTERM signal. Shutting down...');
     client.end();
     process.exit(0);
-    });
+});
 
 process.on('SIGINT', () => {
     logToConsole('WARNING', 'Received SIGINT signal. Shutting down...');
